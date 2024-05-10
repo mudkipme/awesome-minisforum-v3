@@ -45,6 +45,20 @@ Download [alsa-soft-mixer.conf](scripts/alsa-soft-mixer.conf) and move it to `~/
 
 Download [rotateButton.sh](scripts/rotateButton.sh).  _Credits to Briar._
 
+### Faical Recognition
+
+The IR Camera works with [howdy](https://github.com/boltgolt/howdy). Fedora-based distribution users can install [howdy-beta](https://copr.fedorainfracloud.org/coprs/principis/howdy-beta/) with Copr. _Credits to Tsuki4735._
+
+The `device_path` in `/etc/howdy/config.ini` needs to be set to `/dev/video3`.
+
+## Hardware Guide
+
+### Micro SD Card Adapter
+
+If you want to expand the storage of the tablet with the SD Card slot, the BaseQi iSDA 750A adapter is a good fit. _Credits to killshot007\_._
+
+![](images/sd-card-adapter.jpg)
+
 ## Known Issues
 
 - Enabling AMD Fluid Motion Frames in *AMD Software: Adrenalin Edition* may cause Windows to reboot.
