@@ -25,6 +25,23 @@ Useful (unofficial) information for [Minisforum V3 AMD Tablet](https://www.minis
 
 ## Guide for Windows Users
 
+### V3 Adj
+
+A kludge of scripts with [RefreshRateSwitcher](https://github.com/sryze/RefreshRateSwitcher) and [RyzenAdj](https://github.com/FlyGoat/RyzenAdj) to control power limits along with auto setting brightness and refresh at startup and when the unit is swapped between AC power and Battery.
+
+Extract [V3Adj.zip](scripts/V3Adj.zip) to c:\ and run V3 Adj task install.bat as admin to install. 
+
+Defaults to 37w and 9.5w for AC and Battery.
+Edit values in V3_PowerSwap.bat to set your own limits.
+
+***NOTE YOU NEED TO SET THE BIOS PROFILE TO 54W TO BEABLE TO INCREASE CURRENT LIMITS***
+
+### CRU profile to expand VRR range down to 36Hz
+
+CRU V3 Profile.zip is [Custom Resolution Utility](https://www.monitortests.com/forum/Thread-Custom-Resolution-Utility-CRU) By ToastyX and a profile made for the V3 Tablet that extends the VRR range.
+
+Extract [CRU V3 Profile.zip](scripts/Cru%20V3%20Profile.zip) and run cru and import the v3 36 to 165.bin file and restart the display driver with restart64.exe or just reboot the machine.
+
 ### Enable integer scaling
 
 Run [Embeded_Integer_Scaling_On.reg](scripts/Embeded_Integer_Scaling_On.reg) and reboot Windows. Then enable integer scaling in *Display* in *AMD Software: Adrenalin Edition*. _Credits to Wobble._
