@@ -40,7 +40,7 @@ Edit values in V3_PowerSwap.bat to set your own limits.
 
 CRU V3 Profile.zip is [Custom Resolution Utility](https://www.monitortests.com/forum/Thread-Custom-Resolution-Utility-CRU) By ToastyX and a profile made for the V3 Tablet that extends the VRR range.
 
-Extract [CRU V3 Profile.zip]([scripts/Cru%20V3%20Profile.zip](https://github.com/mudkipme/awesome-minisforum-v3/blob/main/scripts/Cru%20V3%20Profile.zip) and run cru and import the v3 36 to 165.bin file and restart the display driver with restart64.exe or just reboot the machine.
+Extract [CRU V3 Profile.zip](https://github.com/mudkipme/awesome-minisforum-v3/blob/main/scripts/Cru%20V3%20Profile.zip) and run cru and import the v3 36 to 165.bin file and restart the display driver with restart64.exe or just reboot the machine.
 
 ### Enable integer scaling
 
