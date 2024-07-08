@@ -49,11 +49,17 @@ Run [Embeded_Integer_Scaling_On.reg](scripts/Embeded_Integer_Scaling_On.reg) and
 
 ## Guide for Linux Users
 
-### Workaround for volume buttons not working when the keyboard is detached
+### Fix volume buttons not working when the keyboard is detached
 
-Install [Input Remapper](https://github.com/sezanzeb/input-remapper) and configure like the screenshot below. _Credits to Aru._
+Create `/etc/libinput/local-overrides.quirks` with the following content:
+```ini
+[Minisforum V3 volume keys]
+MatchName=AT Translated Set 2 keyboard
+MatchDMIModalias=dmi:*svnMicroComputer(HK)TechLimited:pnV3:*
+ModelTabletModeNoSuspend=1
+```
 
-![](images/input-remapper.webp)
+This has been submitted upstream as https://gitlab.freedesktop.org/libinput/libinput/-/merge_requests/1026 and should be setup on future distributions out of the box without having to do this manually.
 
 ### Workaround for global volume control with the speaker
 
