@@ -51,6 +51,14 @@ Run [Embeded_Integer_Scaling_On.reg](scripts/Embeded_Integer_Scaling_On.reg) and
 
 ### Fix volume buttons not working when the keyboard is detached
 
+Quick install:
+
+```bash
+curl -L https://raw.githubusercontent.com/mudkipme/awesome-minisforum-v3/main/linux_fix_sound.sh | sudo sh
+```
+
+Manual Install:
+
 Create `/etc/libinput/local-overrides.quirks` with the following content:
 ```ini
 [Minisforum V3 volume keys]
