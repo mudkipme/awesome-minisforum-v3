@@ -51,6 +51,8 @@ Run [Embeded_Integer_Scaling_On.reg](scripts/Embeded_Integer_Scaling_On.reg) and
 
 ### Fix volume buttons not working when the keyboard is detached
 
+**Update: [libinput](https://gitlab.freedesktop.org/libinput/libinput/-/releases/1.26.2) 1.26.2 is released with quirks for Minisforum V3. If you are using Arch-based distributions or Fedora 40, you don't need to do this manually.** 
+
 Quick install:
 
 ```bash
