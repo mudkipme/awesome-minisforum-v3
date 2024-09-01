@@ -56,7 +56,7 @@ Run [Embeded_Integer_Scaling_On.reg](scripts/Embeded_Integer_Scaling_On.reg) and
 Quick install:
 
 ```bash
-curl -L https://raw.githubusercontent.com/mudkipme/awesome-minisforum-v3/main/linux_fix_sound.sh | sudo sh
+curl -L https://raw.githubusercontent.com/mudkipme/awesome-minisforum-v3/main/scripts/linux_fix_sound.sh | sudo sh
 ```
 
 Manual Install:
@@ -74,6 +74,12 @@ This has been submitted upstream as https://gitlab.freedesktop.org/libinput/libi
 ### Workaround for global volume control with the speaker
 
 Download [alsa-soft-mixer.conf](scripts/alsa-soft-mixer.conf) and move it to `~/.config/wireplumber/wireplumber.conf.d/alsa-soft-mixer.conf`, then reboot. _Credits to Aru._
+
+### Disable audio session suspension
+
+If you are seeing the headphone port keep dropping every few seconds when the port is used, you can disable audio session suspension.
+
+Download [alsa-disable-suspension.conf](scripts/alsa-disable-suspension.conf) and move it to `~/.config/wireplumber/wireplumber.conf.d/alsa-disable-suspension.conf`.
 
 ### Manual rotation script
 
