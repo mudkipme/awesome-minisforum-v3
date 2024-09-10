@@ -49,6 +49,10 @@ Run [Embeded_Integer_Scaling_On.reg](scripts/Embeded_Integer_Scaling_On.reg) and
 
 ## Guide for Linux Users
 
+### Automatic rotation and accelerometers
+
+See https://github.com/mudkipme/awesome-minisforum-v3/issues/2#issuecomment-2279282784.
+
 ### Fix volume buttons not working when the keyboard is detached
 
 **Update: [libinput](https://gitlab.freedesktop.org/libinput/libinput/-/releases/1.26.2) 1.26.2 is released with quirks for Minisforum V3. If you are using Arch-based distributions or Fedora 40, you don't need to do this manually.** 
@@ -101,5 +105,5 @@ If you want to expand the storage of the tablet with the SD Card slot, the BaseQ
 
 ## Known Issues
 
-- Enabling AMD Fluid Motion Frames in *AMD Software: Adrenalin Edition* may cause Windows to reboot.
-- Automatic rotation and accelerometers doesn't work in Linux.
+- ~~Enabling AMD Fluid Motion Frames in *AMD Software: Adrenalin Edition* may cause Windows to reboot.~~
+    - It seems this issue is fixed with latest AMD Software: Adrenalin Edition driver.
