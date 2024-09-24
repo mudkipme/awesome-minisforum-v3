@@ -95,6 +95,10 @@ The IR Camera works with [howdy](https://github.com/boltgolt/howdy). Fedora-base
 
 The `device_path` in `/etc/howdy/config.ini` needs to be set to `/dev/video3`.
 
+### Remap Recall Button
+
+Can be done using [Input Remapper](https://github.com/sezanzeb/input-remapper) (tested on Nobara). For example, you can map it to KEY_COMPOSE, which bring up the context menu.
+
 ## Hardware Guide
 
 ### Micro SD Card Adapter
