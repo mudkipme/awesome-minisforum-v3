@@ -83,7 +83,17 @@ ModelTabletModeNoSuspend=1
 
 ### Workaround for global volume control with the speaker
 
-Download [alsa-soft-mixer.conf](scripts/alsa-soft-mixer.conf) and move it to `~/.config/wireplumber/wireplumber.conf.d/alsa-soft-mixer.conf`, then reboot. _Credits to Aru._
+> [!WARNING]
+> `alsa-firmware` is required for this to work!
+
+1. Download [alsa-soft-mixer.conf](scripts/alsa-soft-mixer.conf) to `/etc/wireplumber/wireplumber.conf.d/alsa-soft-mixer.conf`
+    - Use `~/.config/wireplumber/wireplumber.conf.d/alsa-soft-mixer.conf` for a per-user basis. 
+2. Reboot the system
+
+> [!NOTE]
+> Run `wpctl status` and `pactl list short cards` to see which card is applicable if this does not work. Whichever matches `Family 17h/19h` is the correct card
+
+_Credits to Aru._
 
 ### Disable audio session suspension
 
@@ -100,6 +110,9 @@ Download [rotateButton.sh](scripts/rotateButton.sh).  _Credits to Briar._
 The IR Camera works with [howdy](https://github.com/boltgolt/howdy). Fedora-based distribution users can install [howdy-beta](https://copr.fedorainfracloud.org/coprs/principis/howdy-beta/) with Copr. _Credits to Tsuki4735._
 
 The `device_path` in `/etc/howdy/config.ini` needs to be set to `/dev/video3`.
+
+> [!NOTE]
+> `/dev/video2` may be required instead for specific models.
 
 ### Remap Copilot Button
 
