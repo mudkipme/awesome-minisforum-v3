@@ -31,18 +31,23 @@ Useful (unofficial) information for [Minisforum V3 AMD Tablet](https://www.minis
 
 A kludge of scripts with [RefreshRateSwitcher](https://github.com/sryze/RefreshRateSwitcher) and [RyzenAdj](https://github.com/FlyGoat/RyzenAdj) to control power limits along with auto setting brightness and refresh at startup and when the unit is swapped between AC power and Battery.
 
-Extract [V3Adj.zip](https://github.com/mudkipme/awesome-minisforum-v3/blob/main/scripts/V3Adj.zip) to c:\ and run V3 Adj task install.bat as admin to install. 
+Extract [V3Adj.zip](https://github.com/mudkipme/awesome-minisforum-v3/blob/main/scripts/V3Adj.zip) to `C:\` and run `V3 Adj task install.bat` **as Administrator** to install. 
 
-Defaults to 37w and 9.5w for AC and Battery.
-Edit values in V3_PowerSwap.bat to set your own limits.
+> [!NOTE]
+> - Defaults to 37W and 9.5W for AC and Battery.
+> - Edit values in `V3_PowerSwap.bat` to set your own limits.
 
-***NOTE YOU NEED TO SET THE BIOS PROFILE TO 54W TO BEABLE TO INCREASE CURRENT LIMITS***
+> [!WARNING]
+> You need to set the BIOS profile to 54W to be able to increase the current limits!
 
 ### CRU profile to expand VRR range down to 36Hz
 
-CRU V3 Profile.zip is [Custom Resolution Utility](https://www.monitortests.com/forum/Thread-Custom-Resolution-Utility-CRU) By ToastyX and a profile made for the V3 Tablet that extends the VRR range.
+[CRU V3 Profile.zip](https://github.com/mudkipme/awesome-minisforum-v3/blob/main/scripts/Cru%20V3%20Profile.zip) is [Custom Resolution Utility](https://www.monitortests.com/forum/Thread-Custom-Resolution-Utility-CRU) By ToastyX and a profile made for the V3 Tablet that extends the VRR range.
 
-Extract [CRU V3 Profile.zip](https://github.com/mudkipme/awesome-minisforum-v3/blob/main/scripts/Cru%20V3%20Profile.zip) and run cru and import the v3 36 to 165.bin file and restart the display driver with restart64.exe or just reboot the machine.
+1. Extract [CRU V3 Profile.zip](https://github.com/mudkipme/awesome-minisforum-v3/blob/main/scripts/Cru%20V3%20Profile.zip)
+2. Run `CRU.exe`
+3. Import the `v3 36 to 165.bin` file
+4. Restart the display driver with `restart64.exe`, or reboot the machine
 
 ### Enable integer scaling
 
@@ -56,7 +61,9 @@ See https://github.com/mudkipme/awesome-minisforum-v3/issues/2#issuecomment-2279
 
 ### Fix volume buttons not working when the keyboard is detached
 
-**Update: [libinput](https://gitlab.freedesktop.org/libinput/libinput/-/releases/1.26.2) 1.26.2 is released with quirks for Minisforum V3. If you are using Arch-based distributions or Fedora 40, you don't need to do this manually.** 
+> [!NOTE]
+> [libinput](https://gitlab.freedesktop.org/libinput/libinput/-/releases/1.26.2) 1.26.2 is released with quirks for Minisforum V3.
+> If you are using Arch-based distributions or Fedora 40, you don't need to do this manually.
 
 Quick install:
 
@@ -74,11 +81,33 @@ MatchDMIModalias=dmi:*svnMicroComputer(HK)TechLimited:pnV3:*
 ModelTabletModeNoSuspend=1
 ```
 
-This has been submitted upstream as https://gitlab.freedesktop.org/libinput/libinput/-/merge_requests/1026 and should be setup on future distributions out of the box without having to do this manually.
-
 ### Workaround for global volume control with the speaker
 
-Download [alsa-soft-mixer.conf](scripts/alsa-soft-mixer.conf) and move it to `~/.config/wireplumber/wireplumber.conf.d/alsa-soft-mixer.conf`, then reboot. _Credits to Aru._
+> [!WARNING]
+> `alsa-firmware` is required for this to work!
+
+1. Download [alsa-soft-mixer.conf](scripts/alsa-soft-mixer.conf) to `/etc/wireplumber/wireplumber.conf.d/alsa-soft-mixer.conf`
+    - Use `~/.config/wireplumber/wireplumber.conf.d/alsa-soft-mixer.conf` for a per-user basis. 
+2. Reboot the system
+
+> [!NOTE]
+> Run `wpctl status` and `pactl list short cards` to see which card is applicable if this does not work. Whichever matches `Family 17h/19h HD Audio Controller` is the correct card
+> Example output
+> ```
+> ❯ wpctl status
+> 
+> Audio
+>   └─  Devices:
+>       48. Rembrandt Radeon High Definition Audio Controller [alsa]
+>       49. Family 17h/19h HD Audio Controller  [alsa]
+>  
+> ❯ pactl list short cards
+> 
+> 48      alsa_card.pci-0000_c4_00.1      alsa
+> 49      alsa_card.pci-0000_c4_00.6      alsa
+> ```
+
+_Credits to Aru._
 
 ### Disable audio session suspension
 
@@ -96,10 +125,13 @@ The IR Camera works with [howdy](https://github.com/boltgolt/howdy). Fedora-base
 
 The `device_path` in `/etc/howdy/config.ini` needs to be set to `/dev/video3`.
 
-### Remap Recall Button
+> [!NOTE]
+> `/dev/video2` may be required instead for specific models.
 
-By default, the recall button triggers `Super L + Shift L + XF86TouchpadOff`.
-It can be remapped using [Input Remapper](https://github.com/sezanzeb/input-remapper) (tested on Nobara). For example, you can map it to KEY_COMPOSE, which bring up the context menu.
+### Remap Copilot Button
+
+By default, the Copilot button triggers `Super L + Shift L + XF86TouchpadOff`.
+It can be remapped using [Input Remapper](https://github.com/sezanzeb/input-remapper) (tested on Nobara). For example, you can map it to `KEY_COMPOSE`, which bring up the context menu.
 
 ## Hardware Guide
 
