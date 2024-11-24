@@ -91,7 +91,21 @@ ModelTabletModeNoSuspend=1
 2. Reboot the system
 
 > [!NOTE]
-> Run `wpctl status` and `pactl list short cards` to see which card is applicable if this does not work. Whichever matches `Family 17h/19h` is the correct card
+> Run `wpctl status` and `pactl list short cards` to see which card is applicable if this does not work. Whichever matches `Family 17h/19h HD Audio Controller` is the correct card
+> Example output
+> ```
+> ❯ wpctl status
+> 
+> Audio
+>   └─  Devices:
+>       48. Rembrandt Radeon High Definition Audio Controller [alsa]
+>       49. Family 17h/19h HD Audio Controller  [alsa]
+>  
+> ❯ pactl list short cards
+> 
+> 48      alsa_card.pci-0000_c4_00.1      alsa
+> 49      alsa_card.pci-0000_c4_00.6      alsa
+> ```
 
 _Credits to Aru._
 
