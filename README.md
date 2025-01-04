@@ -21,7 +21,7 @@ Useful (unofficial) information for [Minisforum V3 AMD Tablet](https://www.minis
 
 ## Resources
 
-- [Drivers and Firmware Update](https://www.minisforum.com/new/support?lang=en#/support/page/download/120)
+- [Drivers and Firmware Update](https://www.minisforum.com.hk/new/support?lang=en#/support/page/spec/120)
 - [Minisforum Discord Server](https://discord.com/invite/Pxrg8WpFCa)
 - [RyzenAdj](https://github.com/FlyGoat/RyzenAdj): Adjust power management settings.
 
