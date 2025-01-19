@@ -18,6 +18,7 @@ Useful (unofficial) information for [Minisforum V3 AMD Tablet](https://www.minis
 - [Minisforum V3 FULL Walkthrough. Ryzen 7 8840U Windows 11 Pro Tablet](https://www.youtube.com/watch?v=c_zbxrHhtQA) by TechTablets
 - [It's a THICK tablet and I'm kinda into that - Minisforum V3](https://www.youtube.com/watch?v=kI_Y231zwoU) by ShortCircuit (Linus Tech Tips)
 - [Minisforum V3 AMD Tablet Review! The Best 3 in 1 We've Ever Gotten Our Hands On](https://www.youtube.com/watch?v=Sy4PjHci6qs) by ETA PRIME
+- [Minisforum V3 Tablet FULL Test and Review: This is Stupid Fast - Ryzen 8840U, 32GB RAM, 2560x1600](https://youtu.be/hIwAlQLy8Go?si=vSMEaYY7aPcamGkk) by Tek Syndicate
 
 ## Resources
 
