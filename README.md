@@ -26,6 +26,11 @@ Useful (unofficial) information for [Minisforum V3 AMD Tablet](https://www.minis
 - [Minisforum Discord Server](https://discord.com/invite/Pxrg8WpFCa)
 - [RyzenAdj](https://github.com/FlyGoat/RyzenAdj): Adjust power management settings.
 
+## Accessories
+
+- [M2 Skins](https://m2skins.com/products/minisforum-v3-tablet-2024): Skins for the back and sides of the V3, and for the magnectic cover and keyboard
+
+
 ## Guide for Windows Users
 
 ### V3 Adj
