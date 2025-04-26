@@ -114,13 +114,13 @@ _Credits to Aru._
 > [!NOTE]
 > This workaround does not include adding in the a alsa-soft-mixer.conf file that the previous workaround recommends. Adding that file may have different results.
 
-1. Add the following to /usr/share/alsa-card-profile/mixer/paths/analog-output.conf.common
+1. Add the following to `/usr/share/alsa-card-profile/mixer/paths/analog-output.conf.common` before `[Element PCM]`
 >```
 > [Element Master]
 > switch = mute
 > volume = ignore
 >```
-2. Modify /usr/share/alsa-card-profile/mixer/paths/analog-output-headphones.conf file. Simply make it so [Element Master] looks like the following, which is basically changing volume from "merge" to "ignore"
+2. Modify `/usr/share/alsa-card-profile/mixer/paths/analog-output-headphones.conf` file. Simply make it so `[Element Master]` looks like the following, which is basically changing volume from "merge" to "ignore"
 >```
 >  [Element Master]
 > switch = mute
@@ -128,7 +128,7 @@ _Credits to Aru._
 > override-map.1 = all
 > override-map.2 = all-left,all-right
 >```
-3. Restart the wireplumber service using systemctl --user restart wireplumber.service
+3. Restart the wireplumber service using `systemctl --user restart wireplumber.service`
 4. Test headphones and speakers, they should be working with volume keys now
 
 _Credits to ChaosSpectre & makito89_
