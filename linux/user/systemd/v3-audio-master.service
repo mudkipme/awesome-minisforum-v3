@@ -1,0 +1,12 @@
+[Unit]
+Description=V3: keep the ALC245 hardware Master at 0 dB (something resets it to -23 dB at boot; PipeWire never raises it)
+After=wireplumber.service pipewire.service
+Wants=wireplumber.service
+
+[Service]
+Type=oneshot
+ExecStartPre=/usr/bin/sleep 3
+ExecStart=/usr/bin/amixer -q -c Generic_1 sset Master 100%%
+
+[Install]
+WantedBy=default.target

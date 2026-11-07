@@ -1,0 +1,152 @@
+#!/usr/bin/env bash
+# v3-power — AC/battery power manager for the Minisforum V3 (Ryzen 8840U / Radeon 780M)
+#
+#   v3-power set <auto|saver|performance>   choose mode (persisted)
+#   v3-power auto                            re-evaluate & apply (udev / boot / resume)
+#   v3-power status                          machine-readable status (key=value)
+#
+# Effective profile:  auto -> saver on battery, performance on AC.
+# Services listed in /var/lib/v3-power/autostop (∩ allowlist /etc/v3-power/services.conf)
+# are stopped when entering "saver" and restarted when leaving it (only if we stopped them).
+set -uo pipefail
+
+CONF=/etc/v3-power/v3-power.conf
+SERVICES=/etc/v3-power/services.conf
+STATE_DIR=/var/lib/v3-power
+RUN_DIR=/run/v3-power
+MODE_FILE=$STATE_DIR/mode
+AUTOSTOP_FILE=$STATE_DIR/autostop
+EFFECTIVE_FILE=$RUN_DIR/effective
+STOPPED_FILE=$RUN_DIR/stopped
+
+# ---- defaults (override in $CONF) ----
+SAVER_ABM=3
+AC_PSU=/sys/class/power_supply/ACAD
+WIFI_IF=wlp2s0
+[ -r "$CONF" ] && . "$CONF"
+
+log() { logger -t v3-power -- "$*"; [ -t 1 ] && echo "$*"; return 0; }
+w()   { [ -w "$1" ] && echo "$2" > "$1" 2>/dev/null; }   # best-effort sysfs write
+
+on_ac() { [ "$(cat $AC_PSU/online 2>/dev/null)" = 1 ]; }
+mode()  { local m; m=$(cat "$MODE_FILE" 2>/dev/null); case $m in auto|saver|performance) echo "$m";; *) echo auto;; esac; }
+effective_for() { case $1 in saver|performance) echo "$1";; *) on_ac && echo performance || echo saver;; esac; }
+
+
+# BIOS thermal mode via the minisforum_v3_wmi driver (driver/): performance on AC = 28 W, low-power = 15 W.
+# Power limits and fan curve on top of that: /usr/local/lib/v3-power/v3-tune.
+# Only acts when that driver is loaded AND mode writes were enabled (allow_profile_set=1).
+platform_profile_apply() {
+  local pp=/sys/firmware/acpi/platform_profile allow=/sys/module/minisforum_v3_wmi/parameters/allow_profile_set
+  [ -w "$pp" ] || return 0
+  case "$(cat "$allow" 2>/dev/null)" in Y|y|1) ;; *) return 0 ;; esac
+  local want=low-power; [ "$1" = performance ] && on_ac && want=performance
+  [ "$(cat "$pp")" = "$want" ] || { echo "$want" > "$pp" 2>/dev/null && log "thermal mode -> $want"; }
+}
+
+apply_profile() {
+  local p=$1 c
+  if [ "$p" = saver ]; then
+    for c in /sys/devices/system/cpu/cpu[0-9]*/cpufreq; do
+      w $c/scaling_governor powersave
+      w $c/energy_performance_preference power
+    done
+    w /sys/devices/system/cpu/cpufreq/boost 0
+    for c in /sys/class/drm/card*/device; do w $c/power_dpm_force_performance_level auto; done
+    for c in /sys/class/drm/card*-eDP-*/amdgpu/panel_power_savings; do w $c $SAVER_ABM; done
+    w /sys/module/pcie_aspm/parameters/policy powersupersave
+    w /proc/sys/vm/dirty_writeback_centisecs 6000
+    w /proc/sys/vm/dirty_expire_centisecs 6000
+    w /sys/module/snd_hda_intel/parameters/power_save 1
+    command -v iw >/dev/null && iw dev $WIFI_IF set power_save on 2>/dev/null
+  else
+    for c in /sys/devices/system/cpu/cpu[0-9]*/cpufreq; do
+      w $c/scaling_governor performance      # EPP is forced to "performance" by this governor
+    done
+    w /sys/devices/system/cpu/cpufreq/boost 1
+    for c in /sys/class/drm/card*/device; do w $c/power_dpm_force_performance_level auto; done
+    for c in /sys/class/drm/card*-eDP-*/amdgpu/panel_power_savings; do w $c 0; done
+    w /sys/module/pcie_aspm/parameters/policy default
+    w /proc/sys/vm/dirty_writeback_centisecs 500
+    w /proc/sys/vm/dirty_expire_centisecs 3000
+    w /sys/module/snd_hda_intel/parameters/power_save 0
+    command -v iw >/dev/null && iw dev $WIFI_IF set power_save off 2>/dev/null
+  fi
+  platform_profile_apply "$p"
+  /usr/local/lib/v3-power/v3-tune apply "$p" >/dev/null 2>&1 || true
+  # Always: PCI runtime PM (safe on this machine; cheap win)
+  for c in /sys/bus/pci/devices/*/power/control; do w $c auto; done
+}
+
+# allowlist: "id|Label|unit1 unit2 ..."  -> prints units for id
+units_of() { awk -F'|' -v id="$1" '$1==id {print $3}' "$SERVICES"; }
+allowed_ids() { grep -v '^\s*#' "$SERVICES" | awk -F'|' 'NF>=3 {print $1}'; }
+
+services_enter_saver() {
+  : > "$STOPPED_FILE"
+  local id u units rev
+  for id in $(cat "$AUTOSTOP_FILE" 2>/dev/null); do
+    units=$(units_of "$id"); [ -n "$units" ] || continue
+    local any=0
+    for u in $units; do systemctl -q is-active "$u" && any=1; done
+    [ $any = 1 ] || continue
+    rev=$(echo $units | tr ' ' '\n' | tac | tr '\n' ' ')
+    systemctl stop $rev && echo "$id" >> "$STOPPED_FILE" && log "saver: stopped $id"
+  done
+}
+
+services_leave_saver() {
+  local id
+  for id in $(cat "$STOPPED_FILE" 2>/dev/null); do
+    systemctl start $(units_of "$id") && log "performance: restarted $id"
+  done
+  : > "$STOPPED_FILE"
+}
+
+cmd_auto() {
+  mkdir -p "$RUN_DIR" "$STATE_DIR"
+  local m p prev
+  m=$(mode); p=$(effective_for "$m"); prev=$(cat "$EFFECTIVE_FILE" 2>/dev/null)
+  apply_profile "$p"
+  if [ "$p" != "$prev" ]; then
+    if [ "$p" = saver ]; then services_enter_saver; elif [ "$prev" = saver ]; then services_leave_saver; fi
+    echo "$p" > "$EFFECTIVE_FILE"      # watched by the user session (refresh-rate switch)
+    log "mode=$m effective=$p (ac=$(on_ac && echo 1 || echo 0))"
+  fi
+  chmod 644 "$EFFECTIVE_FILE" 2>/dev/null
+  /usr/local/lib/v3-power/v3-fw list 2>/dev/null || true
+  # Some firmware re-applies its own limits shortly after an AC event: re-assert once.
+  # (synchronous: we run inside a oneshot unit, background children would be killed)
+  if [ "${V3_NO_REASSERT:-0}" != 1 ]; then
+    sleep 8   # firmware re-sends its own limits after charger/mode events
+    /usr/local/lib/v3-power/v3-tune apply "$p" >/dev/null 2>&1 || true
+  fi
+}
+
+cmd_status() {
+  local cur volt watts=0
+  cur=$(cat /sys/class/power_supply/BATT/current_now 2>/dev/null || echo 0)
+  volt=$(cat /sys/class/power_supply/BATT/voltage_now 2>/dev/null || echo 0)
+  watts=$(awk -v c="$cur" -v v="$volt" 'BEGIN{printf "%.1f", c*v/1e12}')
+  echo "mode=$(mode)"
+  echo "effective=$(cat $EFFECTIVE_FILE 2>/dev/null || echo unknown)"
+  echo "ac=$(on_ac && echo 1 || echo 0)"
+  echo "battery=$(cat /sys/class/power_supply/BATT/capacity 2>/dev/null)"
+  echo "battery_status=$(cat /sys/class/power_supply/BATT/status 2>/dev/null)"
+  echo "watts=$watts"
+}
+
+case "${1:-}" in
+  set)
+    case "${2:-}" in auto|saver|performance) ;; *) echo "usage: v3-power set auto|saver|performance" >&2; exit 2;; esac
+    mkdir -p "$STATE_DIR"; echo "$2" > "$MODE_FILE"; cmd_auto ;;
+  auto)   cmd_auto ;;
+  status) cmd_status ;;
+  firewall)
+    case "${2:-}" in
+      on)  ufw --force enable  >/dev/null && log "firewall enabled"; /usr/local/lib/v3-power/v3-fw list ;;
+      off) ufw --force disable >/dev/null && log "firewall disabled"; /usr/local/lib/v3-power/v3-fw list ;;
+      *) echo "usage: v3-power firewall on|off" >&2; exit 2 ;;
+    esac ;;
+  *) echo "usage: v3-power {set auto|saver|performance | auto | status | firewall on|off}" >&2; exit 2 ;;
+esac

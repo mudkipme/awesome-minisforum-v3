@@ -1,0 +1,6 @@
+[Unit]
+Description=V3 Power: keep the screen awake (idle inhibit)
+PartOf=graphical-session.target
+
+[Service]
+ExecStart=%h/.local/bin/v3-keepawake

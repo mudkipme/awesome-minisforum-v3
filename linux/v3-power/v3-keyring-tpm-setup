@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# One-time setup: seal your keyring password in the TPM so the keyring unlocks
+# automatically at login (also with fingerprint). Re-run after changing your password.
+# Works from your normal terminal, or from a root shell opened with sudo (acts for $SUDO_USER).
+set -euo pipefail
+
+if [ "$(id -u)" -eq 0 ]; then
+  user=${SUDO_USER:-}
+  [ -n "$user" ] && [ "$user" != root ] || { echo "Run this as your normal user (not a plain root login)."; exit 1; }
+  as_user() { runuser -u "$user" -- "$@"; }
+  SUDO=""
+else
+  user=$(id -un)
+  as_user() { "$@"; }
+  SUDO="sudo"
+fi
+uid=$(id -u "$user")
+cred=/etc/credstore.encrypted/v3-keyring-pw-$uid.cred
+[ -S "/run/user/$uid/bus" ] || { echo "No desktop session found for $user. Run this while logged in to the desktop."; exit 1; }
+
+read -rsp "Keyring password for $user (normally your login password): " PW; echo
+printf %s "$PW" | as_user env V3_UID="$uid" /usr/local/lib/v3-power/v3-keyring-unlock --verify
+
+$SUDO install -d -m 700 /etc/credstore.encrypted
+# --with-key=tpm2: decryptable only by THIS machine's TPM (useless on another PC)
+printf %s "$PW" | $SUDO systemd-creds encrypt --with-key=tpm2 --name=v3-keyring-pw - "$cred"
+unset PW
+$SUDO chmod 600 "$cred"
+$SUDO systemctl daemon-reload
+$SUDO systemctl enable "v3-keyring-unlock@$uid.service"
+
+echo "Testing TPM decrypt + unlock now..."
+$SUDO systemctl start "v3-keyring-unlock@$uid.service"
+journalctl -u "v3-keyring-unlock@$uid.service" -n 3 --no-pager -o cat
+echo "Done. From the next login on, the keyring unlocks automatically."

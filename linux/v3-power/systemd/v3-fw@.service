@@ -1,0 +1,6 @@
+[Unit]
+Description=V3 Power firewall rule operation
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/v3-power/v3-fw %I

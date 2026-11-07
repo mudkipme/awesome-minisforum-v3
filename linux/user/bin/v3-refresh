@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Switch the internal panel refresh rate to match the V3 power profile (60 Hz saver / 165 Hz performance).
+eff=$(cat /run/v3-power/effective 2>/dev/null) || exit 0
+if [ "$eff" = saver ]; then hz=60; else hz=165; fi
+cur=$(cosmic-randr list 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | awk '/\(current\)/{print $3; exit}')
+[ "${cur%%.*}" = "$hz" ] && exit 0
+exec cosmic-randr mode eDP-1 2560 1600 --refresh "$hz" --adaptive-sync automatic

@@ -1,0 +1,192 @@
+#!/usr/bin/python3 -I
+# v3-tune — power limits (ryzenadj) + fan curve (EC fan table) for the Minisforum V3.
+#   v3-tune apply <saver|performance>   apply the user's tuning for that profile
+#   v3-tune apply current               same, for the active profile
+#   v3-tune status                      print current state as key=value
+# User settings: /var/lib/v3-power/tuning.json (user-writable; everything is validated + clamped here).
+#
+# Safety (fan): based on ~/bios-hppac CHANGES.md §13/§14. Only the six DUTY bytes (levels 0-5) are
+# ever written; BIOS/EC firmware must be verified; the rest of the table must match the factory
+# table of the current EC mode byte-for-byte, otherwise nothing is written. Duty is clamped to
+# [factory Quiet duty, 100] per level and forced non-decreasing. Level 6 (88 °C+, 90 %) untouched.
+# Safety (power): limits clamped to 5..45 W (Minisforum's own Performance mode = 28 W). Thermal
+# limits (tctl 90 °C, skin 45 °C) are never changed.
+import json, os, subprocess, sys, time
+
+TUNING = "/var/lib/v3-power/tuning.json"
+RYZENADJ = "/usr/local/bin/ryzenadj"
+EC = "/sys/kernel/debug/ec/ec0/io"
+DUTY_OFFS = [0x14, 0x18, 0x1C, 0x20, 0x24, 0x28]
+LEVEL_TEMPS = [45, 54, 66, 76, 88, 93]  # upper bound of each level, °C
+FACTORY = {  # EC 0x10..0x30 per mode byte (0x30), recorded 2026-11-07 (live-dsl/modes/*-3.bin)
+    0xB0: bytes.fromhex("0f190028192d192320362d4226423610284c421e2b584c3a325d58c85a645d00b0"),
+    0xB1: bytes.fromhex("0f190028192d192320362d7a2b42365b364c42283a584c103c5d58c85a645d00b1"),
+    0xB2: bytes.fromhex("0f190028192d193724362d642d42365b384c42283c584c21405d58c85a645d00b2"),
+}
+QUIET_DUTY = [FACTORY[0xB0][o - 0x10] for o in DUTY_OFFS]   # 25 32 38 40 43 50
+W_MIN, W_MAX = 5, 45   # user-confirmed: the V3 sustains >40 W with fans at 100 % (Windows)
+
+DEFAULTS = {
+    "saver":       {"power": {"stapm": 8, "fast": 10, "slow": 8}, "fan": "factory"},
+    "performance": {"power": "factory", "fan": "factory"},
+}
+
+def log(msg):
+    subprocess.run(["logger", "-t", "v3-tune", msg])
+
+def rd(p):
+    try:
+        return open(p).read().strip()
+    except OSError:
+        return ""
+
+def load():
+    cfg = json.loads(json.dumps(DEFAULTS))
+    try:
+        user = json.load(open(TUNING))
+        for prof in ("saver", "performance"):
+            if isinstance(user.get(prof), dict):
+                cfg[prof].update({k: v for k, v in user[prof].items() if k in ("power", "fan")})
+    except (OSError, ValueError):
+        pass
+    return cfg
+
+# ------------------------------------------------------------------ power
+
+def clamp_w(v, lo=W_MIN, hi=W_MAX):
+    try:
+        return max(lo, min(hi, int(round(float(v)))))
+    except (TypeError, ValueError):
+        return None
+
+# BIOS limits per platform_profile (W: stapm, fast, slow), read with ryzenadj -i on 2026-11-07
+BIOS_LIMITS = {"low-power": (15, 15, 15), "balanced": (15, 22, 22), "performance": (28, 28, 28)}
+
+def last_power():
+    for l in rd("/run/v3-power/tuning-state").splitlines():
+        if l.startswith("power="):
+            return l[6:]
+    return "factory"
+
+def apply_power(spec):
+    if not os.access(RYZENADJ, os.X_OK):
+        return "factory"
+    if spec == "factory" or not isinstance(spec, dict):
+        # the SMU keeps whatever was set last (by us or by hand): always put the BIOS ones back
+        if True:
+            bios = BIOS_LIMITS.get(rd("/sys/firmware/acpi/platform_profile"), BIOS_LIMITS["low-power"])
+            subprocess.run([RYZENADJ, f"--stapm-limit={bios[0]*1000}", f"--fast-limit={bios[1]*1000}",
+                            f"--slow-limit={bios[2]*1000}", f"--apu-slow-limit={bios[2]*1000}"], capture_output=True, cwd="/")
+            log(f"power restored to BIOS {bios}")
+        return "factory"
+    stapm, fast, slow = (clamp_w(spec.get(k)) for k in ("stapm", "fast", "slow"))
+    if None in (stapm, fast, slow):
+        return "invalid"
+    slow = min(slow, fast)            # slow PPT can't exceed fast PPT
+    stapm = min(stapm, slow)          # sustained can't exceed slow PPT
+    r = subprocess.run([RYZENADJ, f"--stapm-limit={stapm*1000}", f"--fast-limit={fast*1000}",
+                        f"--slow-limit={slow*1000}", f"--apu-slow-limit={slow*1000}"], capture_output=True, text=True, cwd="/")
+    ok = r.returncode == 0
+    log(f"power {stapm}/{fast}/{slow} W -> {'ok' if ok else 'FAILED ' + r.stderr.strip()[:200]}")
+    return f"{stapm}/{fast}/{slow}"
+
+# ------------------------------------------------------------------ fan
+
+def fw_verified():
+    return rd("/sys/class/dmi/id/bios_version") in ("1.05", "1.06") and \
+           rd("/sys/class/dmi/id/ec_firmware_release") == "8.8"
+
+def ec_sys_state():
+    if not os.path.exists("/sys/module/ec_sys"):
+        return "absent"
+    return "rw" if rd("/sys/module/ec_sys/parameters/write_support") == "Y" else "ro"
+
+def ec_sys_set(state):
+    cur = ec_sys_state()
+    if cur == state:
+        return True
+    if cur != "absent":
+        if subprocess.run(["modprobe", "-r", "ec_sys"]).returncode != 0:
+            return False
+    if state == "absent":
+        return True
+    args = ["modprobe", "ec_sys"] + (["write_support=1"] if state == "rw" else [])
+    return subprocess.run(args).returncode == 0
+
+def ec_table():
+    with open(EC, "rb") as f:
+        return f.read(256)[0x10:0x31]
+
+def sanitize_curve(curve):
+    if not (isinstance(curve, list) and len(curve) == 6):
+        return None
+    out, prev = [], 0
+    for i, v in enumerate(curve):
+        try:
+            v = int(v)
+        except (TypeError, ValueError):
+            return None
+        v = max(QUIET_DUTY[i], min(100, v), prev)   # never below factory Quiet, never decreasing
+        out.append(v)
+        prev = v
+    return out
+
+def apply_fan(spec):
+    if not fw_verified():
+        return "unsupported-firmware"
+    before = ec_sys_state()
+    if before == "absent" and spec == "factory":
+        return "factory"                      # nothing to check without ec_sys; EC default is factory
+    if not ec_sys_set("ro" if before == "absent" else before):
+        return "ec_sys-unavailable"
+    try:
+        table = ec_table()
+        mode = table[-1]
+        if mode not in FACTORY:
+            return "unknown-mode"
+        fac = FACTORY[mode]
+        # everything except the duty bytes must match the factory table of this mode
+        if any(table[i] != fac[i] for i in range(len(fac)) if (i + 0x10) not in DUTY_OFFS):
+            log(f"fan table differs from factory outside duty bytes, refusing: {table.hex()}")
+            return "unexpected-table"
+        want = [fac[o - 0x10] for o in DUTY_OFFS] if spec == "factory" else sanitize_curve(spec)
+        if want is None:
+            return "invalid"
+        cur = [table[o - 0x10] for o in DUTY_OFFS]
+        if cur == want:
+            return "factory" if spec == "factory" else "custom"
+        if not ec_sys_set("rw"):
+            return "ec_sys-rw-failed"
+        with open(EC, "r+b", buffering=0) as f:
+            for o, v in zip(DUTY_OFFS, want):
+                assert o in DUTY_OFFS and 0 <= v <= 100
+                f.seek(o); f.write(bytes([v]))
+        time.sleep(0.2)
+        back = [ec_table()[o - 0x10] for o in DUTY_OFFS]
+        ok = back == want
+        log(f"fan duty {cur} -> {want} ({'ok' if ok else 'READBACK ' + str(back)})")
+        return ("factory" if spec == "factory" else "custom") if ok else "readback-mismatch"
+    finally:
+        ec_sys_set("ro" if before != "absent" else "absent")
+
+# ------------------------------------------------------------------ main
+
+def main():
+    if sys.argv[1:] == ["apply", "current"]:     # from v3-tune.service (applet "Apply")
+        eff = rd("/run/v3-power/effective")
+        sys.argv[2] = eff if eff in ("saver", "performance") else "performance"
+    if len(sys.argv) >= 3 and sys.argv[1] == "apply" and sys.argv[2] in ("saver", "performance"):
+        prof = load()[sys.argv[2]]
+        p = apply_power(prof["power"])
+        f = apply_fan(prof["fan"])
+        os.makedirs("/run/v3-power", exist_ok=True)
+        with open("/run/v3-power/tuning-state", "w") as fh:
+            fh.write(f"profile={sys.argv[2]}\npower={p}\nfan={f}\n")
+        os.chmod("/run/v3-power/tuning-state", 0o644)
+        print(f"power={p} fan={f}")
+    elif len(sys.argv) == 2 and sys.argv[1] == "status":
+        print(rd("/run/v3-power/tuning-state"))
+    else:
+        sys.exit("usage: v3-tune apply saver|performance | status")
+
+main()

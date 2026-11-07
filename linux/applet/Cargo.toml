@@ -1,0 +1,21 @@
+[package]
+name = "cosmic-applet-v3-power"
+version = "0.1.0"
+edition = "2024"
+description = "COSMIC panel applet: V3 power mode + background service toggles"
+
+[dependencies]
+tokio = { version = "1", features = ["rt"] }
+serde_json = "1"
+
+[dependencies.libcosmic]
+git = "https://github.com/pop-os/libcosmic"
+rev = "dd108aa"
+default-features = false
+features = ["applet"]
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 4
+strip = true

@@ -1,0 +1,12 @@
+[Unit]
+Description=V3 Power: adaptive brightness from the ambient light sensor
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+ExecStart=%h/.local/bin/v3-autobrightness
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=graphical-session.target

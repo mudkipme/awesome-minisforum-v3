@@ -1,0 +1,6 @@
+#!/bin/sh
+if [ "$1" = post ]; then
+  /usr/bin/systemctl start --no-block v3-power-auto.service
+  /usr/bin/amixer -q -c Generic_1 sset Master 100% 2>/dev/null   # codec may come back at -23 dB
+fi
+exit 0

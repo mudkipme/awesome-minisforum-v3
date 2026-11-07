@@ -1,0 +1,10 @@
+[Unit]
+Description=Apply refresh rate for V3 power profile
+After=graphical-session.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/v3-refresh
+
+[Install]
+WantedBy=graphical-session.target

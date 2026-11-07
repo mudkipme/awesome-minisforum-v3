@@ -1,0 +1,89 @@
+#!/usr/bin/python3 -I
+# Adaptive brightness for the Minisforum V3: ambient light sensor (iio-sensor-proxy) ->
+# COSMIC display brightness (via cosmic-settings-daemon, so the slider/OSD stay in sync).
+# Manual changes are learned as an offset, like "adaptive brightness" on Windows/macOS.
+import math
+from gi.repository import Gio, GLib
+
+MIN_PCT, MAX_PCT = 8.0, 100.0
+STEP_EVERY_MS = 40          # smooth fade
+HYSTERESIS_PCT = 4.0        # ignore tiny changes
+SMOOTH = 0.25               # EMA factor for lux
+
+sysbus = Gio.bus_get_sync(Gio.BusType.SYSTEM)
+sesbus = Gio.bus_get_sync(Gio.BusType.SESSION)
+
+sensor = Gio.DBusProxy.new_sync(sysbus, Gio.DBusProxyFlags.NONE, None,
+    "net.hadess.SensorProxy", "/net/hadess/SensorProxy", "net.hadess.SensorProxy", None)
+cosmic = Gio.DBusProxy.new_sync(sesbus, Gio.DBusProxyFlags.NONE, None,
+    "com.system76.CosmicSettingsDaemon", "/com/system76/CosmicSettingsDaemon",
+    "com.system76.CosmicSettingsDaemon", None)
+
+def get_max():
+    v = cosmic.get_cached_property("MaxDisplayBrightness")
+    return v.unpack() if v else 65535
+
+def get_cur():
+    r = sesbus.call_sync("com.system76.CosmicSettingsDaemon", "/com/system76/CosmicSettingsDaemon",
+        "org.freedesktop.DBus.Properties", "Get",
+        GLib.Variant("(ss)", ("com.system76.CosmicSettingsDaemon", "DisplayBrightness")),
+        GLib.VariantType("(v)"), Gio.DBusCallFlags.NONE, -1, None)
+    return r.unpack()[0]
+
+def set_raw(raw):
+    sesbus.call_sync("com.system76.CosmicSettingsDaemon", "/com/system76/CosmicSettingsDaemon",
+        "org.freedesktop.DBus.Properties", "Set",
+        GLib.Variant("(ssv)", ("com.system76.CosmicSettingsDaemon", "DisplayBrightness",
+                               GLib.Variant("i", int(raw)))),
+        None, Gio.DBusCallFlags.NONE, -1, None)
+
+def curve(lux):
+    # 0 lux -> 12 %, 10 -> 35 %, 100 -> 56 %, 1000 -> 78 %, 5000+ -> ~93-100 %
+    return 12.0 + 22.0 * math.log10(1.0 + max(lux, 0.0))
+
+state = {"lux": None, "offset": 0.0, "last_set": None, "fade": None}
+MAX = get_max()
+
+def pct_to_raw(p): return round(max(MIN_PCT, min(MAX_PCT, p)) / 100.0 * MAX)
+def raw_to_pct(r): return r * 100.0 / MAX
+
+def apply():
+    if state["lux"] is None:
+        return
+    cur = get_cur()
+    # user moved the slider / pressed brightness keys since our last change -> learn offset
+    if state["last_set"] is not None and abs(cur - state["last_set"]) > MAX * 0.02 and state["fade"] is None:
+        state["offset"] = raw_to_pct(cur) - curve(state["lux"])
+    target = pct_to_raw(curve(state["lux"]) + state["offset"])
+    if abs(raw_to_pct(target) - raw_to_pct(cur)) < HYSTERESIS_PCT:
+        return
+    start_fade(cur, target)
+
+def start_fade(cur, target, steps=12):
+    if state["fade"]:
+        GLib.source_remove(state["fade"])
+    seq = [round(cur + (target - cur) * (i + 1) / steps) for i in range(steps)]
+    def step():
+        v = seq.pop(0)
+        set_raw(v); state["last_set"] = v
+        if not seq:
+            state["fade"] = None
+            return False
+        return True
+    state["fade"] = GLib.timeout_add(STEP_EVERY_MS, step)
+
+def on_props(_proxy, changed, _inv):
+    d = changed.unpack()
+    if "LightLevel" in d:
+        lux = float(d["LightLevel"])
+        state["lux"] = lux if state["lux"] is None else state["lux"] + SMOOTH * (lux - state["lux"])
+
+sensor.connect("g-properties-changed", on_props)
+sensor.call_sync("ClaimLight", None, Gio.DBusCallFlags.NONE, -1, None)
+lv = sensor.get_cached_property("LightLevel")
+if lv is not None:
+    state["lux"] = float(lv.unpack())
+state["last_set"] = get_cur()
+GLib.timeout_add_seconds(2, lambda: (apply(), True)[1])
+apply()
+GLib.MainLoop().run()

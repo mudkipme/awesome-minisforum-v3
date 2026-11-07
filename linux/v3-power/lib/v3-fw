@@ -1,0 +1,110 @@
+#!/usr/bin/python3 -I
+# V3 Power firewall rule helper (runs as root from v3-fw@<op>.service).
+#   list                                      -> refresh /run/v3-power/firewall-rules
+#   add;ACTION;PROTO;PORT;SOURCE;COMMENT      -> e.g. add;allow;tcp;8080;any;Dev server
+#   del;ID                                    -> delete the rule whose id (hash) is ID
+# Every field is strictly validated; anything else is rejected.
+import hashlib, ipaddress, os, re, subprocess, sys
+
+RULES = ["/etc/ufw/user.rules", "/etc/ufw/user6.rules"]
+OUT_DIR = "/run/v3-power"
+OUT = f"{OUT_DIR}/firewall-rules"
+TUPLE = re.compile(r"^### tuple ### (\S+) (\S+) (\S+) (\S+) (\S+) (\S+) (\S+)(?: comment=([0-9a-f]*))?$")
+COMMENT_OK = re.compile(r"^[A-Za-z0-9 ._()\-]{0,40}$")
+PORT_OK = re.compile(r"^\d{1,5}(:\d{1,5})?$")
+
+def fail(msg):
+    subprocess.run(["logger", "-t", "v3-fw", msg]); print(msg, file=sys.stderr); sys.exit(2)
+
+def tuples():
+    seen, out = set(), []
+    for path in RULES:
+        try:
+            lines = open(path).read().splitlines()
+        except OSError:
+            continue
+        for l in lines:
+            m = TUPLE.match(l.strip())
+            if not m:
+                continue
+            action, proto, dport, dst, sport, src, direction, chex = m.groups()
+            iface = direction.split("_", 1)[1] if "_" in direction else ""
+            any_src = src in ("0.0.0.0/0", "::/0")
+            comment = bytes.fromhex(chex).decode(errors="replace") if chex else ""
+            key = (action, proto, dport, "any" if any_src else src, iface)
+            if key in seen:            # v4/v6 twins of the same rule
+                continue
+            seen.add(key)
+            rid = hashlib.sha1("|".join(key).encode()).hexdigest()[:12]
+            out.append(dict(id=rid, action=action, proto=proto, port=dport,
+                            src="any" if any_src else src, iface=iface, comment=comment))
+    return out
+
+def write_list():
+    os.makedirs(OUT_DIR, exist_ok=True)
+    tmp = OUT + ".tmp"
+    with open(tmp, "w") as f:
+        for r in tuples():
+            clean = lambda s: s.replace("\t", " ").replace("\n", " ")
+            f.write("\t".join(clean(r[k]) for k in ("id", "action", "proto", "port", "src", "iface", "comment")) + "\n")
+    os.chmod(tmp, 0o644); os.replace(tmp, OUT)
+
+def ufw(args):
+    r = subprocess.run(["ufw"] + args, capture_output=True, text=True)
+    subprocess.run(["logger", "-t", "v3-fw", "ufw " + " ".join(args) + f" -> rc={r.returncode} {r.stdout.strip()} {r.stderr.strip()}"])
+    return r.returncode == 0
+
+def valid_src(s):
+    if s == "any":
+        return True
+    try:
+        ipaddress.ip_network(s, strict=False); return True
+    except ValueError:
+        return False
+
+def add(action, proto, port, src, comment):
+    if action not in ("allow", "deny"): fail("bad action")
+    if proto not in ("tcp", "udp", "any"): fail("bad protocol")
+    if not valid_src(src): fail("bad source")
+    if not COMMENT_OK.match(comment): fail("bad comment")
+    if port != "any":
+        if not PORT_OK.match(port): fail("bad port")
+        nums = [int(p) for p in port.split(":")]
+        if not all(1 <= n <= 65535 for n in nums) or (len(nums) == 2 and nums[0] >= nums[1]): fail("bad port range")
+        if len(nums) == 2 and proto == "any": fail("a port range needs tcp or udp")
+    elif src == "any":
+        fail("give a port or a source address")
+    args = [action]
+    if proto != "any": args += ["proto", proto]
+    args += ["from", src, "to", "any"]
+    if port != "any": args += ["port", port]
+    if comment: args += ["comment", comment]
+    return ufw(args)
+
+def delete(rid):
+    for r in tuples():
+        if r["id"] == rid:
+            args = ["delete", r["action"]]
+            if r["iface"]: args += ["in", "on", r["iface"]]
+            if r["proto"] != "any": args += ["proto", r["proto"]]
+            args += ["from", r["src"], "to", "any"]
+            if r["port"] != "any": args += ["port", r["port"]]
+            return ufw(args)
+    fail("no such rule")
+
+def main():
+    op = sys.argv[1] if len(sys.argv) > 1 else "list"
+    parts = op.split(";")
+    ok = True
+    if parts[0] == "list":
+        pass
+    elif parts[0] == "add" and len(parts) == 6:
+        ok = add(*parts[1:])
+    elif parts[0] == "del" and len(parts) == 2 and re.fullmatch(r"[0-9a-f]{12}", parts[1]):
+        ok = delete(parts[1])
+    else:
+        fail("bad operation")
+    write_list()
+    sys.exit(0 if ok else 1)
+
+main()

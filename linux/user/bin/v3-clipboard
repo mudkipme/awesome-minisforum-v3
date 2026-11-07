@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Win+V: pick an entry from clipboard history and put it back on the clipboard (then Ctrl+V to paste).
+cliphist list | fuzzel --dmenu --prompt "Clipboard ❯ " --placeholder "Search history…" --width 70 --lines 14 \
+  | cliphist decode | wl-copy

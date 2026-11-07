@@ -1,0 +1,68 @@
+#!/usr/bin/python3 -I
+# Unlock the GNOME "login" keyring with a TPM-sealed password (Windows Hello-style).
+# Runs as the user from v3-keyring-unlock@<uid>.service; systemd decrypts the credential
+# with the TPM and hands it over in $CREDENTIALS_DIRECTORY.
+#   --verify  : read a password from stdin and only check it against the keyring (setup helper)
+import os, sys, time
+from gi.repository import Gio, GLib
+
+COLL = "/org/freedesktop/secrets/collection/login"
+SVC = "org.freedesktop.secrets"
+INTERNAL = "org.gnome.keyring.InternalUnsupportedGuiltRiddenInterface"
+
+def connect():
+    path = f"/run/user/{os.getuid()}/bus"
+    # at login the bus may appear a moment after this service starts; interactively, fail fast
+    for _ in range(3 if "--verify" in sys.argv else 60):
+        if os.path.exists(path):
+            break
+        time.sleep(1)
+    else:
+        sys.exit(f"no session bus at {path}: run this as the desktop user, not root")
+    return Gio.DBusConnection.new_for_address_sync(
+        f"unix:path={path}",
+        Gio.DBusConnectionFlags.AUTHENTICATION_CLIENT | Gio.DBusConnectionFlags.MESSAGE_BUS_CONNECTION,
+        None, None)
+
+def call(bus, path, iface, method, params, rtype=None):
+    return bus.call_sync(SVC, path, iface, method, params,
+                         GLib.VariantType(rtype) if rtype else None,
+                         Gio.DBusCallFlags.NONE, 15000, None)
+
+def is_locked(bus):
+    for _ in range(30):                       # wait for gnome-keyring-daemon + login collection
+        try:
+            v = call(bus, COLL, "org.freedesktop.DBus.Properties", "Get",
+                     GLib.Variant("(ss)", ("org.freedesktop.Secret.Collection", "Locked")), "(v)")
+            return v.unpack()[0]
+        except GLib.Error:
+            time.sleep(1)
+    sys.exit("keyring daemon / login collection not available")
+
+def secret(bus, pw):
+    _, session = call(bus, "/org/freedesktop/secrets", "org.freedesktop.Secret.Service", "OpenSession",
+                      GLib.Variant("(sv)", ("plain", GLib.Variant("s", ""))), "(vo)").unpack()
+    return (session, b"", pw, "text/plain")
+
+def main():
+    bus = connect()
+    if len(sys.argv) > 1 and sys.argv[1] == "--verify":
+        pw = sys.stdin.buffer.read()
+        s = secret(bus, pw)
+        try:   # changing the password to itself succeeds only if the password is right
+            call(bus, "/org/freedesktop/secrets", INTERNAL, "ChangeWithMasterPassword",
+                 GLib.Variant("(o(oayays)(oayays))", (COLL, s, s)))
+        except GLib.Error as e:
+            sys.exit(f"wrong keyring password ({e.message})")
+        print("password OK")
+        return
+    cred = os.path.join(os.environ.get("CREDENTIALS_DIRECTORY", ""), "v3-keyring-pw")
+    pw = open(cred, "rb").read()
+    if not is_locked(bus):
+        print("login keyring already unlocked")
+        return
+    call(bus, "/org/freedesktop/secrets", INTERNAL, "UnlockWithMasterPassword",
+         GLib.Variant("(o(oayays))", (COLL, secret(bus, pw))))
+    print("login keyring unlocked" if not is_locked(bus) else "unlock call returned but keyring still locked")
+
+main()

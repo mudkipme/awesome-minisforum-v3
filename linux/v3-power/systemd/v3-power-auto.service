@@ -1,0 +1,10 @@
+[Unit]
+Description=V3 power manager: apply profile for current power source
+After=multi-user.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/v3-power auto
+
+[Install]
+WantedBy=multi-user.target
