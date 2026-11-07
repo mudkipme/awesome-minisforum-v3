@@ -1,0 +1,22 @@
+// Let the local active user of group "sudo" toggle the V3 power modes and the
+// allowlisted background services (used by the V3 Power panel applet) without a password.
+polkit.addRule(function(action, subject) {
+    if (action.id !== "org.freedesktop.systemd1.manage-units") return;
+    if (!subject.local || !subject.active || !subject.isInGroup("sudo")) return;
+    var verb = action.lookup("verb");
+    var unit = action.lookup("unit") || "";
+    if (verb !== "start" && verb !== "stop" && verb !== "restart") return;
+    var allowed = [
+        "docker.socket","docker.service","containerd.service",
+        "podman.socket","podman.service",
+        "zerotier-one.service","bluetooth.service",
+        "cups.path","cups.socket","cups.service","cups-browsed.service",
+        "avahi-daemon.socket","avahi-daemon.service",
+        "com.system76.SystemUpdater.service","fwupd.service",
+        "v3-power-auto.service","v3-tune.service"
+    ];
+    if (allowed.indexOf(unit) >= 0 || /^v3-power-mode@(auto|saver|performance)\.service$/.test(unit) ||
+        /^v3-firewall@(on|off)\.service$/.test(unit) ||
+        /^v3-fw@[^/]{1,200}\.service$/.test(unit))
+        return polkit.Result.YES;
+});

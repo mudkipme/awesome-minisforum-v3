@@ -1,0 +1,9 @@
+[Unit]
+Description=Watch V3 power profile for refresh-rate switching
+
+[Path]
+PathChanged=/run/v3-power/effective
+Unit=v3-refresh.service
+
+[Install]
+WantedBy=graphical-session.target

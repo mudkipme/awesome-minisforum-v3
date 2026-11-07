@@ -1,0 +1,14 @@
+[Desktop Entry]
+Name=V3 Power
+Comment=Power mode and background service toggles
+Type=Application
+Exec=cosmic-applet-v3-power
+Terminal=false
+Categories=COSMIC;
+Keywords=COSMIC;Applet;Power;Docker;Services;
+Icon=battery-level-50-symbolic
+StartupNotify=true
+NoDisplay=true
+X-CosmicApplet=true
+X-CosmicHoverPopup=Auto
+X-OverflowPriority=10

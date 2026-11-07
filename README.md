@@ -56,9 +56,71 @@ Run [Embeded_Integer_Scaling_On.reg](scripts/Embeded_Integer_Scaling_On.reg) and
 
 ## Guide for Linux Users
 
+### Drivers: fan speeds, temperatures, BIOS fan mode, accelerometer
+
+[`linux/driver`](linux/driver) contains two DKMS kernel modules (no BIOS/EC flashing):
+
+- `minisforum_v3_wmi`:
+  - CPU + system fan RPM and eight EC temperatures (`sensors`);
+  - the BIOS thermal mode (Quiet / Balance / Performance) as `/sys/firmware/acpi/platform_profile`;
+  - the DP-in WMI event.
+  - It replaces the wrong `huawei_wmi` binding.
+- `minisforum_v3_accel`: makes the stock `st_lsm6dsx` driver bind the accelerometer/gyro (ACPI `SMOCF05`), so auto-rotate works.
+
+```bash
+cd linux && sudo ./install.sh --driver && sudo ./driver/selftest.sh
+```
+
+> [!NOTE]
+> Verified on BIOS 1.05/1.06 with EC 8.8. On other firmware the driver keeps its EC command channel off.
+
+The firmware analysis behind it (EC RAM map, vendor EC commands, WMI, ACPI) is in [`linux/docs/firmware-analysis.md`](linux/docs/firmware-analysis.md).
+
+### Full 28 W on the charger (and more), low watts on battery
+
+A stock Linux install stays at **15 W sustained even on AC**. The sustained limit (STAPM) comes from the **BIOS thermal mode**:
+- Quiet/low-power = 15 W;
+- Performance = 28 W.
+
+ryzenadj and ALIB can't change STAPM on this BIOS, so ryzenadj-only TDP scripts have no sustained effect while the tablet is in Quiet mode.
+
+To get the power back:
+- Switch to performance mode, the same EC command Minisforum Space uses on Windows. This gives 28 W sustained.
+- On top of that, ryzenadj's fast/slow limits reach 36–40 W until the chip's own 90 °C limit.
+- Lowering limits on battery works in any mode (8 W measured).
+
+Measurements, what doesn't work, and a warning about ALIB calls: [`linux/docs/power-limits.md`](linux/docs/power-limits.md).
+
+### Fan curve control
+
+The EC's live fan table sits in EC RAM and can be rewritten. Six duty levels, volatile, and the factory curve comes back on every mode switch. Layout, factory tables and safety checks: [`linux/docs/fan-curve.md`](linux/docs/fan-curve.md).
+
+### V3 Power: power manager + COSMIC panel applet
+
+[`linux/v3-power`](linux/v3-power) and [`linux/applet`](linux/applet) contain:
+- **Profiles:** battery/charger profiles (BIOS mode, power limits, fan curve, EPP, ASPM, panel power saving, Wi-Fi power save, 60/165 Hz).
+- **Background services:** auto-stop selected services (Docker, Podman…) on battery.
+- **Panel applet:** tabs for power, performance (limits + fan curve + live sensors), firewall (ufw rule editor) and tools (keep awake, auto-brightness).
+
+Built and tested on Pop!_OS 24.04 (COSMIC). See [`linux/README.md`](linux/README.md) and [`linux/docs/pop-os-tuning.md`](linux/docs/pop-os-tuning.md).
+
+### Speakers too quiet
+
+After boot the ALC245 hardware `Master` control sits at **−23 dB**. PipeWire never raises it, and `alsactl store` doesn't survive a reboot.
+
+Set it at login, and after resume:
+```bash
+amixer -c Generic_1 sset Master 100%
+```
+[`linux/user/systemd/v3-audio-master.service`](linux/user/systemd/v3-audio-master.service) runs it at every login. This also complements the "volume = ignore" workaround below, which leaves `Master` wherever it was.
+
+### Battery charge threshold (BIOS)
+
+BIOS 1.05+ has **Advanced → ACPI setting → Battery charging start** (95 % / 80 % / 50 %). Charging starts only below that level, which stops the constant top-up at 99–100 % while plugged in. It's greyed out if you entered Setup as *User* with a BIOS password set.
+
 ### Automatic rotation and accelerometers
 
-See https://github.com/mudkipme/awesome-minisforum-v3/issues/2#issuecomment-2279282784.
+See https://github.com/mudkipme/awesome-minisforum-v3/issues/2#issuecomment-2279282784, or the `minisforum_v3_accel` driver above.
 
 ### Fix volume buttons not working when the keyboard is detached
 

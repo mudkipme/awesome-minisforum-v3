@@ -1,0 +1,3 @@
+# Example: run a script when the EC signals a DP-in change.
+# Copy to /etc/udev/rules.d/99-minisforum-v3-dpin.rules and adjust the script path.
+ACTION=="change", SUBSYSTEM=="wmi", ENV{MINISFORUM_EVENT}=="DP_IN", RUN+="/usr/local/bin/v3-dpin-event"

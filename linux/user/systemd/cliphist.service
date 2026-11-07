@@ -1,0 +1,12 @@
+[Unit]
+Description=Clipboard history recorder (cliphist)
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+ExecStart=/usr/bin/wl-paste --watch /usr/bin/cliphist -max-items 300 store
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=graphical-session.target

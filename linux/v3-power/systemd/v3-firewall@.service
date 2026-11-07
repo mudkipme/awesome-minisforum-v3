@@ -1,0 +1,6 @@
+[Unit]
+Description=V3 power manager: firewall %i
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/v3-power firewall %i

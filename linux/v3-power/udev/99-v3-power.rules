@@ -1,0 +1,3 @@
+SUBSYSTEM=="power_supply", KERNEL=="ACAD", ACTION=="change", RUN+="/usr/bin/systemctl start --no-block v3-power-auto.service"
+# thermal-mode driver appeared (boot / module reload): apply the profile again so AC gets BIOS performance mode
+SUBSYSTEM=="platform-profile", ACTION=="add", RUN+="/usr/bin/systemctl start --no-block v3-power-auto.service"

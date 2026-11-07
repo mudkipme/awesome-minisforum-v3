@@ -1,0 +1,14 @@
+applet/target/
+driver/*.o
+driver/*.ko
+driver/*.mod
+driver/*.mod.c
+driver/*.cmd
+driver/.*.cmd
+driver/modules.order
+driver/Module.symvers
+__pycache__/
+ec-snapshots/
+ec-modes/
+*.bin
+*.dat

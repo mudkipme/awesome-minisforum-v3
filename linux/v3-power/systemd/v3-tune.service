@@ -1,0 +1,6 @@
+[Unit]
+Description=V3 power: re-apply power limits + fan curve for the active profile
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/v3-power/v3-tune apply current

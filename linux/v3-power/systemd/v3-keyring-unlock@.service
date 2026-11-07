@@ -1,0 +1,14 @@
+[Unit]
+Description=Unlock the login keyring of UID %i with its TPM-sealed password
+After=user@%i.service
+ConditionPathExists=/etc/credstore.encrypted/v3-keyring-pw-%i.cred
+
+[Service]
+Type=oneshot
+User=%i
+LoadCredentialEncrypted=v3-keyring-pw:/etc/credstore.encrypted/v3-keyring-pw-%i.cred
+ExecStart=/usr/local/lib/v3-power/v3-keyring-unlock
+TimeoutStartSec=120
+
+[Install]
+WantedBy=user@%i.service

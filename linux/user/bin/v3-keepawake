@@ -1,0 +1,13 @@
+#!/usr/bin/python3 -I
+# Hold an org.freedesktop.ScreenSaver inhibit for as long as this process runs.
+# cosmic-idle then skips both screen-off and idle suspend. (Lid close still suspends.)
+from gi.repository import Gio, GLib
+
+bus = Gio.bus_get_sync(Gio.BusType.SESSION)
+cookie = bus.call_sync(
+    "org.freedesktop.ScreenSaver", "/org/freedesktop/ScreenSaver", "org.freedesktop.ScreenSaver",
+    "Inhibit", GLib.Variant("(ss)", ("V3 Power", "Keep awake toggle")),
+    GLib.VariantType("(u)"), Gio.DBusCallFlags.NONE, -1, None,
+).unpack()[0]
+print(f"inhibiting idle (cookie {cookie})", flush=True)
+GLib.MainLoop().run()   # inhibitor is dropped automatically when we exit
